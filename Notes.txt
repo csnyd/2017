@@ -16,3 +16,8 @@ git diff <file> #changes to a particular file
 git init
 git add
 git commit
+
+#Push. Log into github, click >new repository >add repository
+#Follow instruction: ...or push an exisiting repository from the command line
+git remote add origin https://github.com/csnyd/2017.git
+git push -u origin master
