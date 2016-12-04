@@ -20,4 +20,6 @@ git commit
 #Push. Log into github, click >new repository >add repository
 #Follow instruction: ...or push an exisiting repository from the command line
 git remote add origin https://github.com/csnyd/2017.git
-git push -u origin master
+git push -u origin 
+
+Jupyter: https://www.cheatography.com/weidadeyue/cheat-sheets/jupyter-notebook/
