@@ -1,0 +1,791 @@
+// node status value check
+var lpName = window.location.pathname.split("/")[2];
+var lp_id = $('#lp_id').val();
+var version = $('#lp_version').val();
+
+// variable will be used MCU
+var curriculumInfo = {};
+
+// $.get("/learning-paths/curriculum-available/" + lp_id,function(data){
+//     curriculumInfo = data;
+//     MCU(curriculumInfo);
+//     call_rating_survey();
+//  }); 
+
+$.get("/learning-paths/curriculum-available/" + lp_id).done(function(data){
+     curriculumInfo = data;
+     MCU(curriculumInfo);
+     call_rating_survey();
+}).fail(function(e){
+    call_rating_survey();
+});
+
+// call_rating_survey();
+
+function lp_user_progress(data) {
+
+     $.get('/students/sm-details/'+ lp_id +'/',function(json){
+        var studentMentorId;
+        if(json.active_sm){
+            studentMentorId = json.active_sm;
+        }else{
+            studentMentorId = json.student_mentors[json.student_mentors.length-1]   
+        }
+        
+        if (!studentMentorId) {
+              $("div.next-call-link").remove();
+        } else {
+             $.get('/students/get-schedule/' + studentMentorId + '/',function(json){
+
+                 if(json){
+                    var data = {};
+                    data.next_call_string = json.formatted_call_time;
+                    data.next_call_link = json.session_link;
+
+                    var nextCallHtml = Mustache.to_html($("#template-next-mentor-call").html(), data);
+                    $("div.next-call-link").empty().html(nextCallHtml);
+                    $(".section_header div.next-call-link a").css({'margin-bottom': "15px"});
+                 }else{
+                     $("div.next-call-link").remove();
+                 }
+            });
+        }
+    }); 
+
+    if(data.wc_status_dict){
+        var postSurvey = new StudentPostCallSurvey();
+        postSurvey.init(data.wc_status_dict.sm_id,curriculumInfo);
+        
+        if(data.wc_status_dict.show_resume_btn){
+             $($("#template-unfreeze-wk-banner").html()).insertAfter('.site-header');
+        }
+        if(data.wc_status_dict.advisor_email){
+            $(".student-advisor-mail").text(data.wc_status_dict.advisor_fname).attr("href", "mailto:" + data.wc_status_dict.advisor_email + "?Subject=Hello");
+        }
+        if(data.wc_status_dict.workshop_student_resource_center){
+            $(".student-resource-center").attr("href", data.wc_status_dict.workshop_student_resource_center);
+        }
+
+    }
+
+    // fb pixel
+    if(data.first_time_lp_access){
+        var fbPixel = $(".learning_path_content").data("fb-pixel");
+        if(fbPixel !== "None"){
+            fbq('track', 'Lead');
+        }
+    }
+
+    if (location.pathname === "/workshops/ux-design/learn" || location.pathname === "/workshops/ux-design/learn/") {
+    
+        var uxLyndaSec = $("div[data-unique=322-content-and-strategy]").parents(".lp_chapter");
+        var uxDesc = uxLyndaSec.find(".description").first();
+
+        if (data.lynda_key) {
+            var strng = '<p>Your Lynda key is <strong>' + data.lynda_key + '</strong></p>';
+            uxDesc.append(strng);
+
+        } else {
+            // uxDesc.append('<a href="#" id="lynda-access-key">Get Lynda.com access key</a>');
+        }
+    }
+
+    if (data.completion) {
+        $('.progress .bar').css("width", data.completion + "%");
+        $('.bar_detail .light').text(data.completion + "%" + ' Complete');
+
+    
+
+    } else {
+        $('.progress .bar').css("width", "0");
+        $('.bar_detail .light').text("0%" + ' Complete');
+
+    }
+
+    for (var key in data.progress) {
+        var label = $('#' + key);
+        if (data.progress[key] == "CO") {
+            if (!label.hasClass("project")) {
+                $('#' + key).text("Completed").addClass('is_checked');
+            } else {
+                $('#' + key).text("Submitted").addClass('is_submitted');
+            }
+            $('#' + key).closest('.each_resource').addClass('is_complete');
+        } else {
+            if (!label.hasClass("project")) {
+                $('#' + key).text("Mark complete").removeClass('is_checked');
+            } else {
+                $('#' + key).text("Submit project").removeClass('is_checked');
+            }
+            $('#' + key).closest('.each_resource').removeClass('is_complete');
+        }
+    }
+
+    for (var key in data.project_links) {
+        var projectLink = data.project_links[key];
+        if (typeof projectLink == "string" && projectLink !== "") {
+            var inputBox = $(".wk_project_link[data-project=" + key + "]");
+            inputBox.val(projectLink);
+            inputBox.siblings(".remove_project_ctn").show();
+            inputBox.parents(".arrow_box").css({
+                'top': '-106px',
+                'padding-bottom': '18px'
+            });
+
+            /*if(projectLink.length > 41){
+          var text = projectLink;
+          trim_text = text.substr(0, 40) + "...";
+          html = '<div class="project_link-ctn"><span>Project Link: <a class="trim" data-trim="'+trim_text+'"  href="'+projectLink+'"" id="sub_project_link_'+key+'" >'+
+                        trim_text +'</div>';
+        }else{
+          html = '<div class="project_link-ctn"><span>Project Link: <a class="trim" data-trim="'+projectLink+'" href="'+projectLink+'"" id="sub_project_link_'+key+'" >'+
+                        projectLink +'</div>';
+        }*/
+
+            var html = '<div class="project_link-ctn"><span>Project Link: <a class="trim" href="#" id="sub_project_link_' + data.learning_node_id + '" >' +
+                escape(projectLink) + '</div>';
+            $("#" + key).parents(".each_resource").find(".text").after(html);
+        }
+
+    }
+
+    signed_up_from_learn_page = data.signed_up_from_learn_page;
+    if (signed_up_from_learn_page) {
+
+        /*var template = $("#template-wrtie-review-share").html();
+      var data = {
+         url: window.location.pathname
+      }
+      $('.rev-share-btns').html(Mustache.to_html(template,data));*/
+
+        // showing popup only for android path for now
+        var pathName = window.location.pathname;
+        if (pathName == "/learning-paths/android/learn" ||
+            pathName == "/learning-paths/android/learn/") {
+            $("#review-share-modal").modal({
+                keyboard: true
+            });
+            $('.rev-share-btns').html($("#template-wrtie-review-share").html());
+        }
+    }
+
+
+
+   
+}
+
+
+
+function call_rating_survey(){
+    // $.getJSON('/learning-paths/learning-path-progress/' + 'data-science' + '/' + version + '/', lp_user_progress); 
+      $.getJSON('/learning-paths/learning-path-progress/' + lpName + '/' + version + '/', lp_user_progress);     
+}
+
+//Calls the tocify method on your HTML div.
+var toc = $("#toc").tocify({
+    selectors: ""
+}).data("toc-tocify");
+$('#toc').tocify({
+    showEffect: "fadeIn",
+    scrollTo: $(".fixed_header").height() + 15,
+    history: true,
+    smoothScroll: false,
+});
+
+// section numbers for toc
+$('.tocify-header').children('li').each(function(index, el) {
+    var itemNumber = index + 1;
+    $(el).children('a').prepend((index + 1) + '. ');
+    $(el).siblings('ul').children('li').each(function(index, el) {
+        $(el).children('a').
+        prepend('<span class="float_left">' + itemNumber + '.' + (index + 1) + '</span>');
+    });
+});
+
+$(document).on('click', '#join-weekly-call-link', function(event) {
+    if(!Modernizr.peerconnection){
+        event.preventDefault();
+        $(".video-call-no-webrtc-modal").modal("show");
+    }
+});
+
+var lpPathname = location.pathname;
+var wkPromoCtn = $(".lp_wk_promo_ctn");
+
+if (lpPathname === "/learning-paths/user-experience-design/learn" || lpPathname === "/learning-paths/user-experience-design/learn/") {
+    wkPromoCtn.show();
+    wkPromoCtn.find(".ux_card").show();
+    $(".toc_sidebar").css("margin-top", "10px");
+
+}
+
+if (lpPathname === "/learning-paths/data-analysis/learn" || lpPathname === "/learning-paths/data-analysis/learn/") {
+    wkPromoCtn.show();
+    wkPromoCtn.find(".data_science_card").show();
+    $(".toc_sidebar").css("margin-top", "10px");
+}
+
+// pre-loading the loading imgs
+$(".sl_loading_ctn").html('<img src="/images/pink_loader.gif"><img src="/images/gray_loader.gif"><img src="/images/green_loader.gif">');
+
+function showLearningPaths(data) {
+    var learning_paths = data;
+    var template = $('#lp-promo-card').html();
+    var html_block = Mustache.to_html(template, learning_paths);
+    $('.l_sidebar').append(html_block);
+
+}
+
+if (window.location.pathname == "/learning-paths/apply-to-Ycombinator/learn" ||
+    window.location.pathname == "/learning-paths/apply-to-Ycombinator/learn/") {
+
+    // fetchJSON('/learning-paths/list/', showLearningPaths);
+    $('.toc_sidebar').css('margin-top', '.6em');
+
+    $('#toc').append($('#lp-promo-card').html());
+    $("#toc-title-y").css('display', 'block');
+}
+
+// if (window.mobilecheck()) {
+//     $('.l_sidebar').remove();
+//     $('#if_mobile').css({
+//         float: 'none',
+//         width: '93%',
+//         margin: '0 auto',
+//     });
+// } else {
+//     var h = $('#disqus_thread').offset().top;
+//     $(window).scroll(function(event) {
+//         if ($(window).scrollTop() > h) {
+//             $('.toc_sidebar').css('position', 'static');
+//         } else {
+//             $('.toc_sidebar').css('position', 'fixed');
+//         }
+//     });
+// }
+
+$(window).scroll(function() {
+    if ($(this).scrollTop() > 150) {
+        $('body').addClass('fixed');
+    } else {
+        $('body').removeClass('fixed');
+    }
+    $('[data-toggle="dropdown"]').parent().removeClass("open");
+});
+
+
+$('.desc').each(function(index, el) {
+    var self = $(this);
+    var text = self.text();
+    var html = self.html();
+    var trimText;
+    if (text.length > 160) {
+        trimText = text.substr(0, 127) + "..." +
+            "<button class='show_more_text'>more</button>";
+        self.attr({
+            'full_text': html,
+            'trim_text': trimText
+        });
+        self.html(trimText);
+    }
+});
+$(document).on('click', '#lynda-access-key', function(event) {
+    event.preventDefault();
+    var $this = $(this);
+    $this.append("...");
+
+    $.getJSON("/workshops/allot-lynda-key/")
+        .done(function(data) {
+
+            var template = $("#template-lynda-key").html();
+            var html = Mustache.to_html(template, data);
+            $("#lynda-access-key").parents(".description").append(html);
+            $("#lynda-access-key").remove();
+        })
+        .fail(function(jqxhr, textStatus, error) {
+
+        });
+
+});
+$(document).on('click', '.show_more_text', function(event) {
+    event.preventDefault();
+    /* Act on the event */
+    var self = $(this);
+    var parent = self.closest('.desc');
+    var fullText = $(parent).attr('full_text');
+    parent.html(fullText);
+    parent.children('p:last').append('<button class="show_less_text" style="display: inline;"><img src="/images/up-arrow.png"></button>')
+});
+
+$(document).on('click', '.show_less_text', function(event) {
+    event.preventDefault();
+    /* Act on the event */
+    var self = $(this);
+    var parent = self.closest('.desc');
+    var trimText = $(parent).attr('trim_text');
+    parent.html(trimText);
+});
+
+// if (window.mobilecheck()) {
+//     $('.l_sidebar').remove();
+//     $('#if_mobile').css({
+//         float: 'none',
+//         width: '93%',
+//         margin: '0 auto',
+//     });
+// } else {
+
+//     var h = $('.lp_chapter:last').offset().top + $('.lp_chapter:last header').height();
+//     $(window).scroll(function(event) {
+//         if ($(window).scrollTop() > h) {
+//             $('.toc_sidebar').css({
+//                 'position':'absolute',
+//                 'margin-top':h
+//             })
+//         } else {
+//             $('.toc_sidebar').css({
+//                 'position':'fixed',
+//                 'top':'13em',
+//                 'margin-top':'5.5em'
+//             });
+//         }
+//     });
+// }
+// Setting all anchor links in new tab
+$(".content a").attr("target", "_blank");
+// wrapping level1 eachresoure in <div class="description">
+$(".level1.each_resource").wrap('<div class="description"></div>');
+
+
+$(document).on('login-check-completed', function() {
+    if (window.mobilecheck()) {
+        // do nothing for now
+    } else {
+        if (!name) {
+            if (login_required) {
+                if (login_popup_timeout > 0) {
+                    setTimeout(function() {
+                        $('#sign_in').modal({
+                            //keyboard: true
+                            keyboard: login_popup_keyboard_esc
+                        })
+                    }, login_popup_timeout); //15000
+                } else {
+                    $('#sign_in').modal({
+                        //keyboard: false
+                        keyboard: login_popup_keyboard_esc
+                    });
+                }
+                if (!login_popup_close_button) {
+                    $("#sign_in .close").remove();
+                    $("#login .close").remove();
+                }
+                $('#sign_up_title').html('<span style="font-weight: bold;color: wheat;">Create an account</span> to track your progress');
+            }
+        }
+    }
+});
+
+var lastAuthor = $(".fixed_header .authors:last");
+var cleanText = lastAuthor.text().replace(",", "");
+lastAuthor.text(cleanText);
+
+function checkProgress() {
+    $('.change_progress').each(function(index, el) {
+
+        var item = $(el);
+        if (item.text().trim() == "NO") {
+            if (item.hasClass('project')) {
+                item.text('Submit project');
+            } else {
+                item.text('Mark complete');
+            }
+        } else {
+            if (item.hasClass('project')) {
+                item.text('Submitted');
+            } else {
+                item.text('Completed');
+            }
+            item.addClass('is_checked');
+            item.closest('.each_resource').addClass('is_complete');
+        }
+    });
+}
+// checkProgress();
+//$('#change_progress').on('click',
+$(document).on('click', '.change_progress', function(event) {
+    event.preventDefault();
+    if (!name) {
+        /*$('#sign_in').modal({keyboard: false});
+    $('#sign_up_title').text("Sign up to track your progress");*/
+        $('#sign_in').modal();
+        var defaultText = "Everything you want to learn, online. Sign up to track your learning and save your favorites.";
+        $('#sign_up_title').text('Create an account to track your progress');
+        $('#sign_in').on('hidden.bs.modal', function(e) {
+            // do something...
+            e.preventDefault();
+            $('#sign_up_title').text(defaultText);
+        })
+        return;
+    }
+    var self = $(this);
+
+    var learning_node_id = self.attr('id');
+    var learning_path_id = self.attr('data-path');
+    var version_id = self.attr('data-version');
+    //  fetchJSON('/learning-paths/learning-node-progress/' +
+    //         learning_node_id + '/' + learning_path_id + '/', refresh_progress_tracking);
+    // TODO, this should be a POST query instead.
+    if (self.hasClass('project')) {
+
+        self.siblings(".arrow_box.submit_project").fadeIn(400);
+        if (self.hasClass("is_submitted")) {
+            $(this).text("Edit project");
+            $(this).css("padding-left", 0);
+        }
+        var viewPortOffset = this.getBoundingClientRect();
+        if (viewPortOffset.top < 222) {
+            var top = $(window).scrollTop() - (240 - viewPortOffset.top);
+            $(window).scrollTop(top);
+        }
+
+        return false;
+        /*var project_link_url = '/learning-paths/project-link?learning_node_id='+learning_node_id+
+                            '&learning_path_id='+learning_path_id+'&project_link=www.google.com';
+    fetchJSON(project_link_url, refresh_progress_tracking);*/
+    } else {
+
+        if (self.hasClass('is_checked')) {
+            self.addClass("unmark").html('<img class="loading" src="/images/gray_loader.gif">');
+        } else {
+            self.prepend('<img class="loading" src="/images/green_loader.gif">');
+        }
+        fetchJSON('/learning-paths/learning-node-progress/' + learning_node_id + '/' + learning_path_id + '/' + version_id + '/', refresh_progress_tracking);
+    }
+});
+
+function refresh_progress_tracking(data) {
+    var item = $('#' + data.learning_node_id);
+    var arrow_box = item.siblings(".arrow_box");
+    var submit_arrow_box = item.siblings(".arrow_box.submit_project");
+    var message_arrow_box = item.siblings(".arrow_box.share_message");
+    if (data.status == "CO") {
+        if (item.hasClass('project')) {
+            item.text("Submitted").addClass('is_submitted').removeClass("is_checked edit_project")
+                .css("padding-left", "20px");
+            submit_arrow_box.find("input").val(data.project_link);
+            submit_arrow_box.find(".btn").html("submit");
+            submit_arrow_box.find(".remove_project_ctn").show();
+            submit_arrow_box.find(".remove_project_ctn a").text("Remove link").addClass("remove_project_link");
+            submit_arrow_box.css({
+                'top': '-100px',
+                'padding-bottom': '18px'
+            });
+            submit_arrow_box.fadeOut(100);
+            if (data.show_project_popup) {
+                message_arrow_box.fadeIn(100).css({
+                    'top': '-136px',
+                    'padding-bottom': '18px'
+                })
+            }
+            var trim_text;
+
+            /*if(data.project_link.length > 41){
+        var text = data.project_link;
+        trim_text = text.substr(0, 40) + "...";
+
+      }else{
+        html = '<div class="project_link-ctn"><span>Project Link: <a class="trim"  id="sub_project_link_'+data.learning_node_id+'" >'+
+                      data.project_link +'</div>';
+      }*/
+            var html = '<div class="project_link-ctn"><span>Project Link: <a class="trim" href="#" id="sub_project_link_' + data.learning_node_id + '" >' +
+                escape(data.project_link) + '</div>';
+            item.parents(".each_resource").find(".project_link-ctn").remove();
+            item.parents(".each_resource").find(".text").after(html);
+
+        } else {
+            item.text("Completed").addClass('is_checked').removeClass("unmark");
+        }
+        item.closest('.each_resource').addClass('is_complete');
+
+    } else {
+        if (item.hasClass('project')) {
+            item.text("Submitted").addClass('is_submitted').removeClass("is_checked edit_project")
+                .css("padding-left", "20px");
+            arrow_box.find("input").val(data.project_link);
+            arrow_box.find(".btn").html("submit");
+            arrow_box.fadeOut(100);
+            $("#sub_project_link_" + data.learning_node_id).text(data.project_link);
+        } else {
+            item.text("Mark complete").removeClass('is_checked').removeClass("unmark");
+        }
+        item.closest('.each_resource').removeClass('is_complete');
+
+    }
+    $('.progress .bar').css("width", data.completion + "%");
+    $('.bar_detail .light').text(data.completion + "%" + ' Complete');
+}
+
+$("div.arrow_box .close-btn").click(function(e) {
+    e.preventDefault();
+    var self = $(this);
+    var parent = self.parents(".arrow_box");
+    var sibling = parent.siblings(".project");
+    parent.fadeOut(400);
+    if (sibling.hasClass("edit_project")) {
+        sibling.text("submitted").css("padding-left", "20px");
+        sibling.removeClass("edit_project");
+    }
+});
+
+function validateProjectLink(project) {
+    var re_weburl = /\./ig;
+    if (re_weburl.test(project)) {
+        return true;
+    } else {
+        return false;
+    }
+}
+
+$(".group_buttons").on("click", ".project-submit-btn", function(e) {
+    e.preventDefault();
+    var self = $(this);
+    var project_submit_btn = self.parents(".arrow_box").siblings(".project");
+    var learning_node_id = project_submit_btn.attr('id');
+    var learning_path_id = project_submit_btn.data('path');
+    var version_id = project_submit_btn.data('version');
+    var project_link = encodeURIComponent(self.siblings("input").val());
+    if (!validateProjectLink(project_link)) {
+        alert("Please enter a valid link");
+        return false;
+    }
+    self.html('<img src="/images/pink_loader.gif" width="16" height="16"> Submitting...');
+    var project_link_url = '/learning-paths/project-link?learning_node_id=' + learning_node_id +
+        '&learning_path_id=' + learning_path_id + '&version_id=' + version_id + '&project_link=' + project_link;
+    fetchJSON(project_link_url, refresh_progress_tracking);
+});
+$(".group_buttons").on("click", ".remove_project_link", function(e) {
+    e.preventDefault();
+    var self = $(this);
+    self.text("Removing...").removeClass("remove_project_link");
+    var project_submit_btn = self.parents(".arrow_box").siblings(".project");
+    var learning_node_id = project_submit_btn.attr('id');
+    var learning_path_id = project_submit_btn.data('path');
+    var version_id = project_submit_btn.data('version');
+    var project_link_url = '/learning-paths/project-link?learning_node_id=' + learning_node_id +
+        '&learning_path_id=' + learning_path_id + '&version_id=' + version_id + '&project_link=';
+    fetchJSON(project_link_url, handle_remove_project);
+
+});
+
+function handle_remove_project(data) {
+    var item = $("input[data-project=" + data.learning_node_id + "]");
+    var parent = item.parents(".arrow_box");
+    var submitBtn = $("#" + data.learning_node_id);
+
+    if (data.status == "NO") {
+        item.val("");
+        parent.find(".remove_project_ctn a").text("Removed");
+        parent.find(".remove_project_ctn").hide();
+        submitBtn.removeClass("is_submitted edit_project").text("Submit project").css("padding-left", "4px");
+        submitBtn.parents(".each_resource").find(".project_link-ctn").remove();
+        parent.css("top", "-76px");
+        parent.fadeOut(100);
+        submitBtn.parents(".each_resource").removeClass('is_complete');
+    } else {
+        parent.find(".remove_project_ctn a").text("Try again").addClass("remove_project_link");
+    }
+    $('.progress .bar').css("width", data.completion + "%");
+    $('.bar_detail .light').text(data.completion + "%" + ' Complete');
+}
+
+$(".each_resource").on("click", ".project_link-ctn a", function(e) {
+    e.preventDefault();
+    var self = $(this);
+    var trim = self.data("trim");
+    var full = self.attr("href");
+    if (self.hasClass("trim")) {
+        self.removeClass("trim");
+        self.parents(".project_link-ctn").addClass("show");
+    } else {
+        self.addClass("trim");
+        self.parents(".project_link-ctn").removeClass("show");
+    }
+});
+
+$("label.project").hover(
+    function() {
+        var self = $(this);
+        if (self.hasClass("is_submitted")) {
+            self.text("Edit project").css("padding-left", 0)
+        }
+    }, function() {
+        var self = $(this);
+        if (self.hasClass("is_submitted")) {
+            if (self.siblings(".arrow_box").css("display") == "block") {
+                self.text("Edit project").css("padding-left", 0).addClass("edit_project");
+            } else {
+                self.text("Submitted").css("padding-left", "20px").removeClass("edit_project");
+            }
+        }
+    }
+);
+
+$("input.message_hide_cntrl").change(function(e) {
+    e.preventDefault();
+    var self = $(this),
+        show_popup;
+    if (self.is(':checked')) {
+        popup = true;
+    } else {
+        popup = false;
+    }
+
+    $.ajax({
+        type: 'POST',
+        url: '/learning-paths/project-share-popup',
+        crossDomain: true,
+        data: {
+            show_popup: popup
+        }
+    })
+        .done(function(data) {
+            if (!data.show_project_popup) {
+                self.parents(".arrow_box.share_message").hide();
+            }
+        })
+        .fail(function(data) {
+            self.prop('checked', false);
+            alert("Please try again");
+        })
+
+});
+
+
+//Major Curriculum Update
+
+var curriculumUpdate = {};
+
+function MCU(curriculumInfo){
+    $.get("/workshops/"+ lpName +"/student-curriculum-version",
+    function(data){
+
+   
+        var versionSwitch ={
+            select:true,
+            showSwitchBtn: false,
+            btnText: '',
+            other_ver_link_text: '',
+            other_ver_link: '',
+            version_selected_text: ''
+        }
+
+        curriculumUpdate.urls = data;
+
+        curriculumUpdate.info = curriculumInfo;
+
+        //calling popup modal
+        modalState(curriculumUpdate);
+
+        var page_version =  $('#lp_version').val();
+
+
+        var page_on_previous_version = (page_version == curriculumUpdate.urls.previous_version);
+        var page_on_current_version = (page_version == curriculumUpdate.urls.current_version);
+        var page_on_latest_version = (page_version == curriculumUpdate.urls.latest_version);
+        var current_is_latest = (curriculumUpdate.urls.latest_version == curriculumUpdate.urls.current_version);
+
+
+        if( curriculumUpdate.urls.previous_version == null  && current_is_latest){
+            versionSwitch.select = false;
+        }
+
+        if (page_on_current_version) {
+            versionSwitch.showSwitchBtn = !curriculumUpdate.urls.selection_made;
+            if (current_is_latest) {
+                versionSwitch.btnText = 'I want to work on <br> this new curriculum!';
+                versionSwitch.other_ver_link_text = 'View Previous Curriculum';
+                versionSwitch.other_ver_link = curriculumUpdate.urls.previous_link;
+                versionSwitch.version_selected_text = 'You are now working <br> on the newest curriculum version.';
+            } else {
+                versionSwitch.btnText = 'I want to work on <br> this curriculum.'
+                versionSwitch.other_ver_link_text = 'View New Curriculum';
+                versionSwitch.other_ver_link = curriculumUpdate.urls.latest_link;
+                versionSwitch.version_selected_text = 'You are now working on <br> a previous curriculum version.';
+            }
+        }
+        else if (page_on_latest_version) {
+            if (!current_is_latest) {
+                versionSwitch.showSwitchBtn = true;
+                versionSwitch.btnText = 'I want to work on <br> this new curriculum!';
+                versionSwitch.other_ver_link_text = 'View Previous Curriculum';
+                versionSwitch.other_ver_link = curriculumUpdate.urls.current_link;
+                versionSwitch.version_selected_text = 'You are now working <br> on the newest curriculum version.';
+            }//else condition is handled above
+        }
+        else if (page_on_previous_version) {
+            if (current_is_latest) {
+                versionSwitch.showSwitchBtn = true;
+                versionSwitch.btnText = 'I want to work on <br> this curriculum.';
+                versionSwitch.other_ver_link_text = 'View New Curriculum';
+                versionSwitch.other_ver_link = curriculumUpdate.urls.current_link;
+                versionSwitch.version_selected_text = 'You are now working on <br> a previous curriculum version.';
+            } else {
+                // We don't allow access to previous if there is a latest version available
+            }
+        }
+
+        curriculumUpdate.versionSwitch = versionSwitch;
+
+        var source   = $("#curriculum-update-buttons-template").html();
+        var template = Handlebars.compile(source);
+        var html = template(curriculumUpdate);
+        $('#content-update').append(html);
+
+        if((page_on_current_version && current_is_latest) || (page_on_latest_version && !current_is_latest)){
+            $('.ov-link').css({'font-size':'14px','display':'block'});
+        }   
+
+        if( page_on_current_version && curriculumUpdate.urls.selection_made) {
+            $('.choose-ver-selected').show();
+        }
+
+        if((page_on_current_version && !current_is_latest) || (page_on_previous_version && current_is_latest)){
+            $('.new-ver-star').show();
+        }
+
+        $(".sh").hover(function(){
+            $(".hover-data").show();
+        });
+        $(".sh").mouseleave(function(){
+            $(".hover-data").hide();
+        });
+
+        $(".btn-c-update").click(function(){
+            $.post("/learning-paths/"+ curriculumUpdate.urls.lp_id + "/change_version/" + page_version ,function(data){
+                 $('.switch-version-btn').hide();
+                 $('.choose-ver-selected').show();
+                 if(page_on_latest_version){
+                    $('.ov-link').attr('href',curriculumUpdate.urls.previous_link);
+                 }else if(page_on_previous_version){
+                    $('.ov-link').attr('href',curriculumUpdate.urls.latest_link);
+                 }             
+            });
+        });
+        })
+
+        function modalState(data){  
+            if(data.info.new_curriculum_available == true && data.urls.multiple_versions_enabled)
+            {   
+                var source   = $("#new-curriculum-update-template").html();
+                var template = Handlebars.compile(source);
+                var html = template(data);
+                $(".curriculumUpdateContainer").append(html);
+                $("#new-curriculum-update-modal").modal("show");
+            }
+        }
+    
+}//end of major curriculum update
+
+
+
