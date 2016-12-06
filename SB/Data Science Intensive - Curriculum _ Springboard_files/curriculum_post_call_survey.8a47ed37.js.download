@@ -1,0 +1,348 @@
+function StudentPostCallSurvey() {
+    this.setJsEvents();
+}
+StudentPostCallSurvey.prototype = {
+    init: function(studentMentorId,curriculumInfo) {
+        var self = this;
+        self.studentMentorId = studentMentorId;
+        $.get('/students/pending-survey/' + self.studentMentorId  + '/', function(data,status,xhr) {
+            if(xhr.status == 204){
+                // do nothing for now
+            }else{ 
+                if(!curriculumInfo.new_curriculum_available)
+                {
+                    $(".wk-weekly-post-survey-curriculum-ctn").fadeIn(500);
+                }
+                self.pendingSurvey = data;
+                self.getCallSurvey();
+                // self.getStudentSchedule();
+            }
+        });
+    },
+    setJsEvents: function() {
+
+        var self = this;
+
+        var studentPostSurveyCtn = $(".student-weekly-post-call-survey-ctn");
+        studentPostSurveyCtn.css('overflow-y', 'scroll');
+
+        studentPostSurveyCtn.on("click", ".survey-thanks-btn", function(event) {
+            event.preventDefault();
+            $(".wk-weekly-post-survey-curriculum-ctn").remove();
+        });
+
+        studentPostSurveyCtn.on('click', '.no-call-checkbox', function(event) {
+            event.preventDefault();
+            studentPostSurveyCtn.find(".resume-post-survey-ctn").removeClass("hidden");
+            studentPostSurveyCtn.find(".resume-call-ctn").addClass("hidden");
+            studentPostSurveyCtn.find('.student-overall-rating').addClass('hidden');
+            studentPostSurveyCtn.find('.student-call-survey-page-1').addClass('hidden');
+            studentPostSurveyCtn.find('.no-call-ctn').addClass('hidden');
+            studentPostSurveyCtn.find(".no-call-survey-questions").removeClass('hidden');
+            //self.scrollFix();
+
+        });
+
+        studentPostSurveyCtn.on("click", ".post-survey-step-1-btn", function(event) {
+            event.preventDefault();
+            var $this = $(this);
+            studentPostSurveyCtn.find(".show-post-survey-step-1").addClass("hidden");
+            studentPostSurveyCtn.find(".resume-call-ctn").removeClass("hidden");
+            studentPostSurveyCtn.find(".student-call-survey-page-1").removeClass("hidden");
+            studentPostSurveyCtn.find(".student-call-survey-page-2").addClass("hidden");
+            studentPostSurveyCtn.find(".student-overall-rating").removeClass("hidden");
+            //self.scrollFix();
+        });
+
+        studentPostSurveyCtn.on("click", ".resume-post-survey-btn", function(event) {
+            event.preventDefault();
+            var $this = $(this);
+            studentPostSurveyCtn.find(".no-call-survey-questions").addClass("hidden");
+            studentPostSurveyCtn.find(".student-overall-rating").removeClass("hidden");
+            studentPostSurveyCtn.find(".no-call-ctn").removeClass("hidden");
+            studentPostSurveyCtn.find(".resume-call-ctn").removeClass("hidden");
+            studentPostSurveyCtn.find(".resume-post-survey-ctn ").addClass("hidden");
+            //self.scrollFix();
+        });
+
+        studentPostSurveyCtn.on("click", ".postcall-survey .submit-post-call-survey-btn", function(event) {
+            event.preventDefault();
+            var surveyPage2 = studentPostSurveyCtn.find(".student-call-survey-page-2");
+            var goals = surveyPage2.find("textarea[data-name=next_week_goals]");
+            // var feedback = surveyPage2.find("textarea[data-name=feedback]");
+            if(goals.val() == ""){
+                goals.siblings(".error-msg").removeClass("hidden");
+            }else{
+                $(this).text("Submitting...");
+                self.submitPostCallHappenSurvey('full');
+            }
+        });
+
+        studentPostSurveyCtn.on("change", ".no-call-survey-questions select.reason", function(event) {
+            event.preventDefault();
+            var otherReason = $(".no-call-survey-questions .no-call-other-reason-ctn");
+            if ($(this).val() == "4") {
+                otherReason.removeClass("hidden");
+            }else{
+                otherReason.addClass("hidden");
+                otherReason.siblings(".error").addClass("hidden");
+            }
+        });
+
+        studentPostSurveyCtn.on("click", ".no-call-survey-submit-btn", function(event) {
+            event.preventDefault();
+            var selectVal = studentPostSurveyCtn.find(".no-call-survey-questions select.reason").val();
+            if(selectVal == 4){
+                var otherReason = studentPostSurveyCtn.find(".no-call-survey-questions textarea[data-name=other-reason]");
+                if(otherReason.val() == ""){
+                    otherReason.parent().siblings("div.error").removeClass("hidden");
+                    return false;
+                }
+            }
+            self.submitNocallHappenSurvey();
+            $(this).text("Submitting...");
+        });
+
+        studentPostSurveyCtn.on("click",".survey-skip-button", function (event) {
+            $.ajax({
+                type: 'PUT',
+                url: '/students/call-survey/' + self.studentMentorId + '/' + self.pendingSurvey.pk + "/",
+                crossDomain: true,
+                contentType: "application/json",
+                data: JSON.stringify({skip:true})
+            })
+                .done(function (data) {
+
+                });
+        });
+
+        studentPostSurveyCtn.on('click','.ratings-submit-btn-ctn .btn', function(event) {
+            var $this = $(this);
+            var stars = studentPostSurveyCtn.find(".student-call-survey-page-1 li").not(".hidden").find(".star[data-step=2]");
+            var postCallSurveyCtn = studentPostSurveyCtn;
+            var allCheckedArr = [];
+
+            if (stars.length > 0) {
+                $.each(stars, function(index, value) {
+                    var score = $(value).raty('score');
+                    if (score == undefined) {
+                        allCheckedArr.push(false);
+                        $(value).siblings().removeClass("hidden");
+                    } else {
+                        allCheckedArr.push(true);
+                    }
+                });
+
+                var allChecked = _.reduce(allCheckedArr, function(memo, num) {
+                    return memo && num;
+                }, true);
+
+                // check of all checked true
+                if (allChecked) {
+                    postCallSurveyCtn.find(".student-overall-rating").addClass("hidden");
+                    postCallSurveyCtn.find('.student-call-survey-page-1').addClass("hidden");
+                    postCallSurveyCtn.find('.student-call-survey-page-2').removeClass("hidden");
+                    postCallSurveyCtn.find('.resume-call-ctn').addClass('hidden');
+                    postCallSurveyCtn.find('.resume-post-survey-ctn').addClass('hidden');
+                    postCallSurveyCtn.find('.show-post-survey-step-1').removeClass('hidden');
+                    self.scrollFix();
+                }
+            }
+        });
+
+    },
+    scrollFix: function() {
+       $(".student-weekly-post-call-survey-ctn").scrollTop(0);
+    },
+    getStudentSchedule: function() {
+
+        var self = this;
+        $.get('/students/get-schedule/' + self.studentMentorId + '/', function(data) {
+            
+            self.schedule = data;
+            self.getCallSurvey();
+        });
+    },
+    getCallSurvey: function() {
+        var self = this;
+
+        $.ajax({
+            type: 'GET',
+            url: ' /students/call-survey/' + self.studentMentorId + '/' + self.pendingSurvey.pk + '/',
+            crossDomain: true
+        })
+            .done(function(data) {
+                self.postCallSurvey = data;
+                // hard coded for now first & third call
+                
+                self.showPostCallSurvey(self.pendingSurvey.is_first_call, self.pendingSurvey.is_third_call, data);
+            })
+            .fail(function(data) {
+
+            });
+    },
+    renderSurveyForm: function(data) {
+        var postCallSurveyCtn = $(".student-weekly-post-call-survey-ctn");
+        var template = Handlebars.compile($("#template-student-post-call-survey").html());
+        var html = template(data);
+
+        $(".student-weekly-call-ctn").addClass("hidden");
+        $(".student-dash-notes-ctn").addClass("hidden");
+
+        postCallSurveyCtn.find(".content").html(html);
+        postCallSurveyCtn.find(".resume-call-ctn").remove();
+    },
+    showNoPostCallSurvey: function(checkboxClicked) {
+        var self = this;
+
+        var postCallSurveyCtn = $(".student-weekly-post-call-survey-ctn");
+
+        if (checkboxClicked) {
+            postCallSurveyCtn.find(".post-call-survey-questions").addClass("hidden");
+            postCallSurveyCtn.find(".resume-call-ctn").addClass("hidden");
+            postCallSurveyCtn.find(".resume-post-survey-ctn").removeClass("hidden");
+        } else {
+            self.renderSurveyForm();
+            postCallSurveyCtn.find(".resume-call-ctn").removeClass("hidden");
+            postCallSurveyCtn.find(".resume-post-survey-ctn").addClass("hidden");
+        }
+
+        postCallSurveyCtn.find(".no-call-survey-questions").removeClass('hidden');
+
+
+    },
+    showPostCallSurvey: function(firstCall, thirdCall, data) {
+
+        var self = this;
+        
+        var postCallSurveyCtn = $(".student-weekly-post-call-survey-ctn");
+        self.renderSurveyForm(data);
+        
+        postCallSurveyCtn.find(".post-call-survey-questions").removeClass('hidden');
+        postCallSurveyCtn.find(".resume-call-ctn").removeClass("hidden");
+        postCallSurveyCtn.find(".resume-post-survey-ctn").addClass("hidden");
+
+        var ratingConfig = {
+            readOnly: false,
+            cancel: false,
+
+            cancelOff: '/js/img/cancel-off.png',
+            cancelOn: '/js/img/cancel-on.png',
+            half: false,
+            number: 5,
+            size: 9,
+            starHalf: '/js/img/star-half.png',
+            starOff: '/js/img/star-off.png',
+            starOn: '/js/img/star-on.png',
+
+            width: 200,
+            score: function() {
+                return $(this).attr('data-number');
+            },
+            click: function(score, evt) {
+                
+                var $this = $(this);
+                var step = $this.data('step');
+                postCallSurveyCtn.find(".no-call-ctn").addClass('hidden');
+                $this.siblings().addClass("hidden");
+                if (step == "1") {
+                    // self.schedule.is_third_call = true;
+                    postCallSurveyCtn.find(".student-call-survey-page-1 li").addClass('hidden');
+                    postCallSurveyCtn.find('.student-call-survey-page-1').removeClass('hidden');
+                    postCallSurveyCtn.css('overflow-y', 'scroll');
+                    if (self.pendingSurvey.is_first_call) {
+                        postCallSurveyCtn.find(".student-call-survey-page-1 li.1st-call").removeClass('hidden');
+                    } else if(self.pendingSurvey.is_third_call){
+                        postCallSurveyCtn.find(".student-call-survey-page-1 li.every-3rd-call").removeClass('hidden');
+                    }else{
+                        postCallSurveyCtn.find(".student-call-survey-page-1 li.recuring-call").removeClass('hidden');
+                    }
+                }
+
+                self.submitPostCallHappenSurvey("partial");
+
+            }
+        };
+        ratingConfig.number = 5;
+        postCallSurveyCtn.find('.star[data-max=5]').raty(ratingConfig);
+    },
+    submitPostCallHappenSurvey: function(type) {
+        var self = this;
+        var postCallSurveyCtn = $(".student-weekly-post-call-survey-ctn");
+     
+        var surveyDataObj = {
+            rating: postCallSurveyCtn.find(".star[data-name=rating]").raty('score') || 0,
+            call_quality: postCallSurveyCtn.find(".star[data-name=call_quality]").raty('score') || 0,
+            setting_goals: postCallSurveyCtn.find(".star[data-name=setting_goals]").raty('score') || 0
+        };
+
+        if(type == "full"){
+            surveyDataObj.next_week_goals = postCallSurveyCtn.find("textarea[data-name=next_week_goals]").val();
+            surveyDataObj.feedback = postCallSurveyCtn.find("textarea[data-name=feedback]").val();
+            surveyDataObj.mail_feedback = postCallSurveyCtn.find("input[data-name=mail_feedback]").prop("checked");
+        }
+
+        function addTechKnowledgeAndProjectFeedback(){
+            surveyDataObj.tech_knowledge = postCallSurveyCtn.find(".star[data-name=tech_knowledge]").raty('score') || 0;
+            surveyDataObj.project_feedback = postCallSurveyCtn.find(".star[data-name=project_feedback]").raty('score') || 0;
+        }
+
+        if (self.pendingSurvey.is_third_call){
+            addTechKnowledgeAndProjectFeedback();
+        }
+
+        if(self.pendingSurvey.is_first_call || self.pendingSurvey.is_third_call){
+            surveyDataObj.rapport = postCallSurveyCtn.find(".star[data-name=rapport]").raty('score') || 0;
+        }else{
+            addTechKnowledgeAndProjectFeedback();
+        }
+
+        console.log(surveyDataObj);
+
+        self.makeSurveySubmitSaveRequest(surveyDataObj, type);
+    },
+    submitNocallHappenSurvey: function() {
+        var self = this;
+        var self = this;
+        var noCallSurveyCtn = $(".postcall-survey .no-call-survey-questions");
+        var surveyObj = {
+            is_no_show: true,
+            no_show_reason: noCallSurveyCtn.find("select.reason").val(),
+            other_reason: noCallSurveyCtn.find("textarea[data-name=other-reason]").val() || null
+        };
+
+        self.makeSurveySubmitSaveRequest(surveyObj, "full");
+    },
+    makeSurveySubmitSaveRequest: function(surveyObj, type) {
+
+        var self = this;
+        var postCallSurveyCtn = $(".student-weekly-post-call-survey-ctn");
+        $.ajax({
+            type: 'PUT',
+            url: '/students/call-survey/' + self.studentMentorId + '/' + self.pendingSurvey.pk + "/",
+            crossDomain: true,
+            contentType: "application/json",
+            data: JSON.stringify(surveyObj)
+        })
+            .done(function(data) {
+                if (type == "full") {
+               
+                    postCallSurveyCtn.find('.postcall-survey > div').addClass('hidden');
+                    postCallSurveyCtn.find('div.survey-thanks-msg').removeClass('hidden');
+                     postCallSurveyCtn.css('overflow-y', 'hidden');
+                    $(document).scrollTop(0);
+                    self.schedule = undefined;
+                    self.postCallSurvey = undefined;
+                }
+            })
+            .fail(function(data) {
+
+            });
+    }
+};
+
+// removing the survey modal
+$(document).on("click","a.survey-thanks-btns", function(e){
+    e.preventDefault();
+    $(".wk-weekly-post-survey-curriculum-ctn").hide();
+});
