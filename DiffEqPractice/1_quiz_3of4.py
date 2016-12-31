@@ -43,6 +43,6 @@ def trajectory():
     axes = matplotlib.pyplot.gca()
     axes.set_xlabel('Horizontal position in m')
     axes.set_ylabel('Vertical position in m')
-    return x, v
+    return(x, v)
 
 trajectory()

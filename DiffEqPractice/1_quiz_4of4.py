@@ -12,14 +12,23 @@ Created on Mon Dec 26 21:48:41 2016
 # and velocity. Use the Forward Euler Method 
 # to accomplish this.
 
-from udacityplots import *
+import numpy
+import matplotlib
 
 h = 1.0 # s
 earth_mass = 5.97e24 # kg
 gravitational_constant = 6.67e-11 # N m2 / kg2
 
+
+def unit_vec(position_vector):
+    return(position_vector/numpy.linalg.norm(position_vector))    
+    
 def acceleration(spaceship_position):
-    ###Your code here.
+    vec_s_to_e = -spaceship_position
+    return(
+        gravitational_constant * earth_mass/ \
+        numpy.linalg.norm(vec_s_to_e)**3 * vec_s_to_e
+        )  
 
 def ship_trajectory():
     num_steps = 13000
@@ -33,12 +42,14 @@ def ship_trajectory():
 
 	###Your code here. This code should call the above 
 	###acceleration function.
+    for step in range(num_steps+1):
+        x[step + 1] = x[step] + h * v[step]
+        v[step + 1] = v[step] + h * acceleration(x[step])
 
-    return x, v
+    return(x, v)
 
-x, v = ship_trajectory()
+(x, v) = ship_trajectory()
 
-@show_plot
 def plot_me():
     matplotlib.pyplot.plot(x[:, 0], x[:, 1])
     matplotlib.pyplot.scatter(0, 0)

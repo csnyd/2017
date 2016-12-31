@@ -27,9 +27,14 @@ git commit
 git remote add origin https://github.com/csnyd/2017.git
 git push -u origin 
 
+Matplotlib, additional practice: http://jakevdp.github.io/mpl_tutorial/tutorial_pages/tut3.html
+colormap 'viridis'
+
+git push -u origin master
+git push -u origin
+git push origin master #after commiting to git
+
 Jupyter: https://www.cheatography.com/weidadeyue/cheat-sheets/jupyter-notebook/
 something? help
 something?? 
 
-Matplotlib, additional practice: http://jakevdp.github.io/mpl_tutorial/tutorial_pages/tut3.html
-colormap 'viridis'
